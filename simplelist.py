@@ -37,15 +37,16 @@ def main():
         return 70
 
     # Check the list is defined
-    if not args.list in config:
+    if not args.list in config['lists']:
         sys.stderr.write('Configuration for list %s does not exist, exiting...' % config_file)
         return 67
+    list_config = config['lists'][args.list]
 
     # Get the list of users
-    if 'gid' in config[args.list]:
-        user_list = get_userlist(config[args.list]['gid'])
-    elif 'users' in config[args.list]:
-        user_list = config[args.list]['users']
+    if 'gid' in list_config:
+        user_list = get_userlist(list_config['gid'])
+    elif 'users' in list_config:
+        user_list = list_config['users']
 
     # Capture the mail
     try:
@@ -54,15 +55,15 @@ def main():
         sys.stderr.write('Invalid email passed, exiting...')
         return 66
 
-    allowed = config[args.list]['allowed_senders']
+    allowed = list_config['allowed_senders']
     if not mail['from'].strip() in allowed:
         return 77
 
-    mail.add_header('X-Loop', '%s@dimension.sh' % args.list)
-    mail.add_header('Errors-To', mail['from'])
-    mail.add_header('Reply-To', mail['from'])
+    mail.add_header('Sender', '<%s@%s>' % (args.list, config['domain']))
+    mail.add_header('List-ID', '%s.%s' % (args.list, config['domain']))
+    mail.add_header('Return-Path', '<>')
 
-    s = smtplib.SMTP(config[args.list].get('smtp', 'localhost'))
+    s = smtplib.SMTP(list_config.get('smtp', 'localhost'))
     for user in get_userlist():
         mail.replace_header('To', user)
         s.send_message(mail)

@@ -1,10 +1,12 @@
-announce:
-  gid: 100
-  allowed_senders:
-    - nikdoof@dimension.sh
+domain: dimension.sh
+lists:
+  announce:
+    gid: 100
+    allowed_senders:
+      - nikdoof@dimension.sh
 
-sysop:
-  users:
-    - nikdoof
-  allowed_senders:
-    - nikdoof@dimension.sh
+  sysop:
+    users:
+      - nikdoof
+    allowed_senders:
+      - nikdoof@dimension.sh
