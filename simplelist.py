@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 Simple List - a simple mailing list tool designed for Postfix
 """
@@ -6,6 +8,7 @@ import sys
 import pwd
 import smtplib
 import argparse
+import email.utils
 from email.parser import Parser
 from email.policy import default
 import yaml
@@ -14,7 +17,7 @@ __author__ = 'Andrew Williams <nikdoof@dimension.sh>'
 __version__ = '0.0.1'
 
 
-def get_userlist(gid: int) -> list:
+def get_userlist(gid):
     """ Returns all usernames in a group gid """
     return [x.pw_name for x in pwd.getpwall() if x.pw_gid == gid]
 
@@ -33,12 +36,12 @@ def main():
         with open(config_file, 'r') as fobj:
             config = yaml.load(fobj)
     else:
-        sys.stderr.write('Config %s does not exist, exiting...' % config_file)
+        sys.stderr.write('Config %s does not exist, exiting...\n' % config_file)
         return 70
 
     # Check the list is defined
     if not args.list in config['lists']:
-        sys.stderr.write('Configuration for list %s does not exist, exiting...' % config_file)
+        sys.stderr.write('Configuration for list %s does not exist, exiting...\n' % config_file)
         return 67
     list_config = config['lists'][args.list]
 
@@ -52,11 +55,12 @@ def main():
     try:
         mail = Parser(policy=default).parsestr(sys.stdin.read())
     except:
-        sys.stderr.write('Invalid email passed, exiting...')
+        sys.stderr.write('Invalid email passed, exiting...\n')
         return 66
 
     allowed = list_config['allowed_senders']
-    if not mail['from'].strip() in allowed:
+    _, from_addr = email.utils.parseaddr(mail['from'])
+    if not from_addr in allowed:
         return 77
 
     mail.add_header('Sender', '<%s@%s>' % (args.list, config['domain']))
@@ -64,7 +68,7 @@ def main():
     mail.add_header('Return-Path', '<>')
 
     s = smtplib.SMTP(list_config.get('smtp', 'localhost'))
-    for user in get_userlist():
+    for user in user_list:
         mail.replace_header('To', user)
         s.send_message(mail)
     s.quit()

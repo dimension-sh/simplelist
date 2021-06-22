@@ -4,7 +4,6 @@ lists:
     gid: 100
     allowed_senders:
       - nikdoof@dimension.sh
-
   sysop:
     users:
       - nikdoof
