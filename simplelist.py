@@ -46,7 +46,7 @@ def main():
     parser = argparse.ArgumentParser('simplelist')
     parser.add_argument('list', help='List name')
     parser.add_argument('-c', '--config', help='Location of the configuration file to use', default='/etc/postfix/simplelist.yaml')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.0.1')
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.0.1') # noqa wps323
     args = parser.parse_args()
 
     # Load config
@@ -65,10 +65,15 @@ def main():
     list_config = config['lists'][args.list]
 
     # Get the list of users
-    if 'gid' in list_config:
+    gid = list_config.get('gid')
+    users = list_config.get('users')
+    if gid:
         user_list = get_userlist(list_config['gid'])
-    elif 'users' in list_config:
+    elif users:
         user_list = list_config['users']
+    else:
+        error('No GID and no users for {0}, exiting...'.format(args.list))
+        return EX_CONFIG
 
     # Capture the mail
     try:
