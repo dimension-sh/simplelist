@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 
-"""Simple List - a simple mailing list tool designed for Postfix"""
+"""Simple List - a simple mailing list tool designed for Postfix."""
 
+import argparse
 import os
-import sys
 import pwd
 import smtplib
-import argparse
+import sys
 from email import utils
 from email.parser import Parser
 from email.policy import default
-import yaml
 
-__author__ = 'Andrew Williams <nikdoof@dimension.sh>'
-__version__ = '0.0.1'
+import yaml
 
 # sysexit.h codes - useful to tell Postfix what is going on
 EX_OK = 0  # successful termination
@@ -48,7 +46,7 @@ def main():
     parser = argparse.ArgumentParser('simplelist')
     parser.add_argument('list', help='List name')
     parser.add_argument('-c', '--config', help='Location of the configuration file to use', default='/etc/postfix/simplelist.yaml')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s {0}'.format(__version__))
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.0.1')
     args = parser.parse_args()
 
     # Load config
