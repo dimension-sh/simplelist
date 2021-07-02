@@ -16,6 +16,24 @@ import yaml
 __author__ = 'Andrew Williams <nikdoof@dimension.sh>'
 __version__ = '0.0.1'
 
+# sysexit.h codes - useful to tell Postfix what is going on
+EX_OK = 0  # successful termination
+EX_USAGE = 64  # command line usage error
+EX_DATAERR = 65  # data format error
+EX_NOINPUT = 66  # cannot open input
+EX_NOUSER = 67  # addressee unknown
+EX_NOHOST = 68  # host name unknown
+EX_UNAVAILABLE = 69  # service unavailable
+EX_SOFTWARE = 70  # internal software error
+EX_OSERR = 71  # system error (e.g., can't fork)
+EX_OSFILE = 72  # critical OS file missing
+EX_CANTCREAT = 73  # can't create (user) output file
+EX_IOERR = 74  # input/output error
+EX_TEMPFAIL = 75  # temp failure; user is invited to retry
+EX_PROTOCOL = 76  # remote error in protocol
+EX_NOPERM = 77  # permission denied
+EX_CONFIG = 78  # configuration error
+
 
 def get_userlist(gid):
     """ Returns all usernames in a group gid """
@@ -36,13 +54,13 @@ def main():
         with open(config_file, 'r') as fobj:
             config = yaml.load(fobj)
     else:
-        sys.stderr.write('Config %s does not exist, exiting...\n' % config_file)
-        return 70
+        sys.stderr.write(f'Config {config_file} does not exist, exiting...\n')
+        return EX_CONFIG
 
     # Check the list is defined
     if not args.list in config['lists']:
-        sys.stderr.write('Configuration for list %s does not exist, exiting...\n' % config_file)
-        return 67
+        sys.stderr.write(f'Configuration for list {config_file} does not exist, exiting...\n')
+        return EX_NOUSER
     list_config = config['lists'][args.list]
 
     # Get the list of users
@@ -56,23 +74,32 @@ def main():
         mail = Parser(policy=default).parsestr(sys.stdin.read())
     except:
         sys.stderr.write('Invalid email passed, exiting...\n')
-        return 66
+        return EX_NOINPUT
 
     allowed = list_config['allowed_senders']
     _, from_addr = email.utils.parseaddr(mail['from'])
     if not from_addr in allowed:
-        return 77
+        return EX_NOPERM
 
     mail.add_header('Sender', '<%s@%s>' % (args.list, config['domain']))
     mail.add_header('List-ID', '%s.%s' % (args.list, config['domain']))
     mail.add_header('Return-Path', '<>')
 
-    s = smtplib.SMTP(list_config.get('smtp', 'localhost'))
+    try:
+        s = smtplib.SMTP(list_config.get('smtp', 'localhost'))
+    except (ConnectionRefusedError, smtplib.SMTPException):
+        return EX_TEMPFAIL
+    except:
+        return EX_CONFIG
+
     for user in user_list:
         mail.replace_header('To', user)
-        s.send_message(mail)
+        try:
+            s.send_message(mail)
+        except smtplib.SMTPException:
+            return EX_TEMPFAIL
     s.quit()
 
 
 if __name__ == '__main__':
-    sys.exit(main() or 0)
+    sys.exit(main() or EX_OK)
