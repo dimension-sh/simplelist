@@ -7,7 +7,7 @@ import sys
 import pwd
 import smtplib
 import argparse
-import email import utils
+from email import utils
 from email.parser import Parser
 from email.policy import default
 import yaml
