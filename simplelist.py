@@ -35,7 +35,12 @@ EX_NOPERM = 77  # permission denied
 EX_CONFIG = 78  # configuration error
 
 
-def get_userlist(gid):
+def error(msg: str) -> None:
+    """Write an error message to stderr"""
+    sys.stderr.write(f'{msg}\n')
+
+
+def get_userlist(gid: int) -> list:
     """ Returns all usernames in a group gid """
     return [x.pw_name for x in pwd.getpwall() if x.pw_gid == gid]
 
@@ -54,12 +59,12 @@ def main():
         with open(config_file, 'r') as fobj:
             config = yaml.load(fobj)
     else:
-        sys.stderr.write(f'Config {config_file} does not exist, exiting...\n')
+        error(f'Config {config_file} does not exist, exiting...')
         return EX_CONFIG
 
     # Check the list is defined
     if not args.list in config['lists']:
-        sys.stderr.write(f'Configuration for list {config_file} does not exist, exiting...\n')
+        error(f'Configuration for list {args.list} does not exist, exiting...')
         return EX_NOUSER
     list_config = config['lists'][args.list]
 
@@ -73,32 +78,42 @@ def main():
     try:
         mail = Parser(policy=default).parsestr(sys.stdin.read())
     except:
-        sys.stderr.write('Invalid email passed, exiting...\n')
+        error('Invalid email passed, exiting...')
         return EX_NOINPUT
 
+    # Check if the sender is allowed
     allowed = list_config['allowed_senders']
     _, from_addr = email.utils.parseaddr(mail['from'])
     if not from_addr in allowed:
+        error(f'{from_addr} doesn\'t have permission to mail to {args.list}')
         return EX_NOPERM
 
+    # Construct the mail headers.
     mail.add_header('Sender', '<%s@%s>' % (args.list, config['domain']))
     mail.add_header('List-ID', '%s.%s' % (args.list, config['domain']))
     mail.add_header('Return-Path', '<>')
 
+    # Attempt to connect to the SMTP server
     try:
         s = smtplib.SMTP(list_config.get('smtp', 'localhost'))
-    except (ConnectionRefusedError, smtplib.SMTPException):
+    except (ConnectionRefusedError, smtplib.SMTPException) as ex:
+        error('Error connecting to the SMTP server: {ex}')
         return EX_TEMPFAIL
-    except:
+    except Exception as ex:
+        error(f'Error sending mail: {ex}')
         return EX_CONFIG
 
+    # Send the mail to each user in the list.
     for user in user_list:
         mail.replace_header('To', user)
         try:
             s.send_message(mail)
-        except smtplib.SMTPException:
+        except smtplib.SMTPException as ex:
+            error(f'Error sending mail: {ex}')
             return EX_TEMPFAIL
     s.quit()
+
+    return EX_OK
 
 
 if __name__ == '__main__':
