@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 """Simple List - a simple mailing list tool designed for Postfix."""
 
@@ -33,20 +33,31 @@ EX_CONFIG = 78  # configuration error
 
 
 def error(msg: str) -> None:
-    """Write an error message to stderr."""
+    """Write an error message to stderr.
+
+    :param msg: The error message
+    """
     sys.stderr.write('{0}\n'.format(msg))
 
 
 def get_userlist(gid: int) -> list:
-    """Returns all usernames in a group gid."""
+    """Return all usernames in a system GID.
+
+    :param gid: The GID of the group to return users for
+    :returns: A list of usernames
+    """
     return [user.pw_name for user in pwd.getpwall() if user.pw_gid == gid]
 
 
-def main():
+def main() -> int:  # noqa: WPS212 WPS210 WPS213
+    """Run simplelist.
+
+    :returns: A exit code as defined in sysexits.h
+    """
     parser = argparse.ArgumentParser('simplelist')
     parser.add_argument('list', help='List name')
     parser.add_argument('-c', '--config', help='Location of the configuration file to use', default='/etc/postfix/simplelist.yaml')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.0.1') # noqa wps323
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.0.1')  # noqa: WPS323
     args = parser.parse_args()
 
     # Load config
@@ -109,7 +120,7 @@ def main():
         mail.replace_header('To', user)
         try:
             server.send_message(mail)
-        except smtplib.SMTPException as ex:
+        except smtplib.SMTPException as ex:  # noqa: WPS440
             error('Error sending mail: {0}'.format(ex))
             return EX_TEMPFAIL
     server.quit()
