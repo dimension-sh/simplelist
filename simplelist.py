@@ -5,8 +5,10 @@
 import argparse
 import os
 import pwd
+import grp
 import smtplib
 import sys
+import syslog
 from email import utils
 from email.parser import Parser
 from email.policy import default
@@ -32,11 +34,13 @@ EX_NOPERM = 77  # permission denied
 EX_CONFIG = 78  # configuration error
 
 
-def error(msg: str) -> None:
+def message(level: int, msg: str) -> None:
     """Write an error message to stderr.
 
-    :param msg: The error message
+    :param level: The syslog level for the message
+    :param msg: The message
     """
+    syslog.syslog(level, msg)
     sys.stderr.write('{0}\n'.format(msg))
 
 
@@ -46,7 +50,13 @@ def get_userlist(gid: int) -> list:
     :param gid: The GID of the group to return users for
     :returns: A list of usernames
     """
-    return [user.pw_name for user in pwd.getpwall() if user.pw_gid == gid]
+    # Get users with a primary GID of the target group
+    users = [user.pw_name for user in pwd.getpwall() if user.pw_gid == gid]
+
+    # Add secondary group members
+    users.extend(grp.getgrgid(gid).gr_mem)
+
+    return set(users)
 
 
 def main() -> int:  # noqa: WPS212 WPS210 WPS213
@@ -60,18 +70,20 @@ def main() -> int:  # noqa: WPS212 WPS210 WPS213
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 1.0.0')  # noqa: WPS323
     args = parser.parse_args()
 
+    syslog.openlog('simplelist', logoption=syslog.LOG_PID, facility=syslog.LOG_MAIL)
+
     # Load config
     config_file = os.path.expandvars(args.config)
     if os.path.exists(config_file):
         with open(config_file, 'r') as fobj:
             config = yaml.safe_load(fobj)
     else:
-        error('Config {0} does not exist, exiting...'.format(config_file))
+        message(syslog.LOG_CRIT, 'Config {0} does not exist, exiting...'.format(config_file))
         return EX_CONFIG
 
     # Check the list is defined
     if args.list not in config['lists']:
-        error('Configuration for list {0} does not exist, exiting...'.format(args.list))
+        message(syslog.LOG_CRIT, 'Configuration for list {0} does not exist, exiting...'.format(args.list))
         return EX_NOUSER
     list_config = config['lists'][args.list]
 
@@ -83,21 +95,21 @@ def main() -> int:  # noqa: WPS212 WPS210 WPS213
     elif users:
         user_list = list_config['users']
     else:
-        error('No GID and no users for {0}, exiting...'.format(args.list))
+        message(syslog.LOG_CRIT, 'No GID and no users for {0}, exiting...'.format(args.list))
         return EX_CONFIG
 
     # Capture the mail
     try:
         mail = Parser(policy=default).parsestr(sys.stdin.read())
     except Exception:
-        error('Invalid email passed, exiting...')
+        message(syslog.LOG_CRIT, 'Invalid email passed, exiting...')
         return EX_NOINPUT
 
     # Check if the sender is allowed
     _, from_addr = utils.parseaddr(mail['from'])
 
     if list_config.get('allowed_senders') is None:
-        error('No allowed_senders defined for {0}, allowing all mail'.format(args.list))
+        message(syslog.LOG_WARNING, 'No allowed_senders defined for {0}, allowing all mail'.format(args.list))
     else:
         allowed_users = []
         for addr in list_config.get('allowed_senders'):
@@ -108,7 +120,7 @@ def main() -> int:  # noqa: WPS212 WPS210 WPS213
                 allowed_users.append(addr)
 
         if from_addr not in allowed_users:
-            error("{0} doesn't have permission to mail to {1}".format(from_addr, args.list))
+            message(syslog.LOG_NOTICE, "{0} doesn't have permission to mail to {1}".format(from_addr, args.list))
             return EX_NOPERM
 
     # Construct the mail headers.
@@ -120,19 +132,20 @@ def main() -> int:  # noqa: WPS212 WPS210 WPS213
     try:
         server = smtplib.SMTP(list_config.get('smtp', 'localhost'))
     except (ConnectionRefusedError, smtplib.SMTPException) as ex:
-        error('Error connecting to the SMTP server: {0}'.format(ex))
+        message(syslog.LOG_ERR, 'Error connecting to the SMTP server: {0}'.format(ex))
         return EX_TEMPFAIL
     except Exception as ex:
-        error('Error sending mail: {0}'.format(ex))
+        message(syslog.LOG_ERR, 'Error sending mail: {0}'.format(ex))
         return EX_CONFIG
 
     # Send the mail to each user in the list.
+    message(syslog.LOG_INFO, 'Sending mail to {0} user(s)'.format(len(user_list)))
     for user in user_list:
         mail.replace_header('To', user)
         try:
             server.send_message(mail)
         except smtplib.SMTPException as ex:  # noqa: WPS440
-            error('Error sending mail: {0}'.format(ex))
+            message(syslog.LOG_ERR, 'Error sending mail: {0}'.format(ex))
             return EX_TEMPFAIL
     server.quit()
 
