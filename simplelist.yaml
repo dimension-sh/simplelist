@@ -8,4 +8,4 @@ lists:
     users:
       - nikdoof
     allowed_senders:
-      - nikdoof@dimension.sh
+      - gid: 1000

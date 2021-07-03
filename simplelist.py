@@ -94,11 +94,22 @@ def main() -> int:  # noqa: WPS212 WPS210 WPS213
         return EX_NOINPUT
 
     # Check if the sender is allowed
-    allowed = list_config['allowed_senders']
     _, from_addr = utils.parseaddr(mail['from'])
-    if from_addr not in allowed:
-        error("{0} doesn't have permission to mail to {1}".format(from_addr, args.list))
-        return EX_NOPERM
+
+    if list_config.get('allowed_senders') is None:
+        error('No allowed_senders defined for {0}, allowing all mail'.format(args.list))
+    else:
+        allowed_users = []
+        for addr in list_config.get('allowed_senders'):
+            if isinstance(addr, dict) and addr.get('gid'):
+                addresses = ['{0}@{1}'.format(user, config['domain']) for user in get_userlist(addr.get('gid'))]
+                allowed_users.extend(addresses)
+            elif isinstance(addr, str):
+                allowed_users.append(addr)
+
+        if from_addr not in allowed_users:
+            error("{0} doesn't have permission to mail to {1}".format(from_addr, args.list))
+            return EX_NOPERM
 
     # Construct the mail headers.
     mail.add_header('Sender', '<{0}@{1}>'.format(args.list, config['domain']))
