@@ -15,24 +15,6 @@ from email.policy import default
 
 import yaml
 
-# sysexit.h codes - useful to tell Postfix what is going on
-EX_OK = 0  # successful termination
-EX_USAGE = 64  # command line usage error
-EX_DATAERR = 65  # data format error
-EX_NOINPUT = 66  # cannot open input
-EX_NOUSER = 67  # addressee unknown
-EX_NOHOST = 68  # host name unknown
-EX_UNAVAILABLE = 69  # service unavailable
-EX_SOFTWARE = 70  # internal software error
-EX_OSERR = 71  # system error (e.g., can't fork)
-EX_OSFILE = 72  # critical OS file missing
-EX_CANTCREAT = 73  # can't create (user) output file
-EX_IOERR = 74  # input/output error
-EX_TEMPFAIL = 75  # temp failure; user is invited to retry
-EX_PROTOCOL = 76  # remote error in protocol
-EX_NOPERM = 77  # permission denied
-EX_CONFIG = 78  # configuration error
-
 
 def message(level: int, msg: str) -> None:
     """Write an error message to stderr.
@@ -79,12 +61,12 @@ def main() -> int:  # noqa: WPS212 WPS210 WPS213
             config = yaml.safe_load(fobj)
     else:
         message(syslog.LOG_CRIT, 'Config {0} does not exist, exiting...'.format(config_file))
-        return EX_CONFIG
+        return os.EX_CONFIG
 
     # Check the list is defined
     if args.list not in config['lists']:
         message(syslog.LOG_CRIT, 'Configuration for list {0} does not exist, exiting...'.format(args.list))
-        return EX_NOUSER
+        return os.EX_NOUSER
     list_config = config['lists'][args.list]
 
     # Get the list of users
@@ -96,14 +78,14 @@ def main() -> int:  # noqa: WPS212 WPS210 WPS213
         user_list = list_config['users']
     else:
         message(syslog.LOG_CRIT, 'No GID and no users for {0}, exiting...'.format(args.list))
-        return EX_CONFIG
+        return os.EX_CONFIG
 
     # Capture the mail
     try:
         mail = Parser(policy=default).parsestr(sys.stdin.read())
     except Exception:
         message(syslog.LOG_CRIT, 'Invalid email passed, exiting...')
-        return EX_NOINPUT
+        return os.EX_NOINPUT
 
     # Check if the sender is allowed
     _, from_addr = utils.parseaddr(mail['from'])
@@ -121,7 +103,7 @@ def main() -> int:  # noqa: WPS212 WPS210 WPS213
 
         if from_addr not in allowed_users:
             message(syslog.LOG_NOTICE, "{0} doesn't have permission to mail to {1}".format(from_addr, args.list))
-            return EX_NOPERM
+            return os.EX_NOPERM
 
     # Construct the mail headers.
     mail.add_header('Sender', '<{0}@{1}>'.format(args.list, config['domain']))
@@ -133,10 +115,10 @@ def main() -> int:  # noqa: WPS212 WPS210 WPS213
         server = smtplib.SMTP(list_config.get('smtp', 'localhost'))
     except (ConnectionRefusedError, smtplib.SMTPException) as ex:
         message(syslog.LOG_ERR, 'Error connecting to the SMTP server: {0}'.format(ex))
-        return EX_TEMPFAIL
+        return os.EX_TEMPFAIL
     except Exception as ex:
         message(syslog.LOG_ERR, 'Error sending mail: {0}'.format(ex))
-        return EX_CONFIG
+        return os.EX_CONFIG
 
     # Send the mail to each user in the list.
     message(syslog.LOG_INFO, 'Sending mail to {0} user(s)'.format(len(user_list)))
@@ -146,11 +128,11 @@ def main() -> int:  # noqa: WPS212 WPS210 WPS213
             server.send_message(mail)
         except smtplib.SMTPException as ex:  # noqa: WPS440
             message(syslog.LOG_ERR, 'Error sending mail: {0}'.format(ex))
-            return EX_TEMPFAIL
+            return os.EX_TEMPFAIL
     server.quit()
 
-    return EX_OK
+    return os.EX_OK
 
 
 if __name__ == '__main__':
-    sys.exit(main() or EX_OK)
+    sys.exit(main() or os.EX_OK)
