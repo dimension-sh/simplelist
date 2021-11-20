@@ -3,9 +3,9 @@
 """Simple List - a simple mailing list tool designed for Postfix."""
 
 import argparse
+import grp
 import os
 import pwd
-import grp
 import smtplib
 import sys
 import syslog
@@ -14,6 +14,7 @@ from email.parser import Parser
 from email.policy import default
 
 import yaml
+from yaml.error import YAMLError
 
 
 def message(level: int, msg: str) -> None:
@@ -58,7 +59,11 @@ def main() -> int:  # noqa: WPS212 WPS210 WPS213
     config_file = os.path.expandvars(args.config)
     if os.path.exists(config_file):
         with open(config_file, 'r') as fobj:
-            config = yaml.safe_load(fobj)
+            try:
+                config = yaml.safe_load(fobj)
+            except YAMLError:
+                message(syslog.LOG_CRIT, 'Config {0} is invalid, exiting...'.format(config_file))
+                return os.EX_CONFIG
     else:
         message(syslog.LOG_CRIT, 'Config {0} does not exist, exiting...'.format(config_file))
         return os.EX_CONFIG
@@ -90,14 +95,15 @@ def main() -> int:  # noqa: WPS212 WPS210 WPS213
     # Check if the sender is allowed
     _, from_addr = utils.parseaddr(mail['from'])
 
+    # Build the allow list of users to send to the list, then check it.
     if list_config.get('allowed_senders') is None:
         message(syslog.LOG_WARNING, 'No allowed_senders defined for {0}, allowing all mail'.format(args.list))
     else:
         allowed_users = []
         for addr in list_config.get('allowed_senders'):
             if isinstance(addr, dict) and addr.get('gid'):
-                addresses = ['{0}@{1}'.format(user, config['domain']) for user in get_userlist(addr.get('gid'))]
-                allowed_users.extend(addresses)
+                for sender in get_userlist(addr.get('gid')):
+                    allowed_users.append('{0}@{1}'.format(sender, config['domain']))
             elif isinstance(addr, str):
                 allowed_users.append(addr)
 
