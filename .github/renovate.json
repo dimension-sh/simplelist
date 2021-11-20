@@ -1,0 +1,15 @@
+{
+    "extends": [
+      "config:base"
+    ],
+    "prConcurrentLimit": 0,
+    "rebaseWhen": "never",
+    "masterIssue": true,
+    "commitBody": "Signed-off-by: Andrew Williams <andy@tensixtyone.com>",
+    "timezone": "UTC",
+    "dependencyDashboard": true,
+    "dependencyDashboardAutoclose": true,
+    "assignees": [
+      "@nikdoof"
+    ]
+  }
