@@ -51,7 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser('simplelist')
     parser.add_argument('list', help='List name')
     parser.add_argument('-c', '--config', help='Location of the configuration file to use', default='/etc/postfix/simplelist.yaml')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s 1.1.0')  # noqa: WPS323
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s 1.1.1')  # noqa: WPS323
     return parser
 
 
