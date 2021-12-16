@@ -17,7 +17,7 @@ import yaml
 from yaml.error import YAMLError
 
 
-def message(level: int, msg: str) -> None:
+def message(level: int, msg: str):
     """Write an error message to stderr.
 
     :param level: The syslog level for the message
@@ -42,16 +42,25 @@ def get_userlist(gid: int) -> list:
     return set(users)
 
 
-def main() -> int:  # noqa: WPS212 WPS210 WPS213
-    """Run simplelist.
+def build_parser() -> argparse.ArgumentParser:
+    """
+    Generate a ArgumentParser instance with the required options.
 
-    :returns: A exit code as defined in sysexits.h
+    :returns: An ArgumentParser instance
     """
     parser = argparse.ArgumentParser('simplelist')
     parser.add_argument('list', help='List name')
     parser.add_argument('-c', '--config', help='Location of the configuration file to use', default='/etc/postfix/simplelist.yaml')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 1.1.0')  # noqa: WPS323
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> int:
+    """Run simplelist.
+
+    :returns: A exit code as defined in sysexits.h
+    """
+    args = build_parser().parse_args()
 
     syslog.openlog('simplelist', logoption=syslog.LOG_PID, facility=syslog.LOG_MAIL)
 
