@@ -22,5 +22,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           name: "Version ${{ github.ref_name }}"
+          generate_release_notes: true
           files: |
             dist/*
